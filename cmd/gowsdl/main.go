@@ -53,6 +53,7 @@ import (
 	"go/format"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	gen "github.com/hooklift/gowsdl"
@@ -103,7 +104,13 @@ func main() {
 	}
 
 	// load wsdl
-	gowsdl, err := gen.NewGoWSDL(wsdlPath, *pkg, *insecure, *makePublic)
+	prefix := map[string]string{
+		"http://schemas.xmlsoap.org/wsdl/soap12/": "Soap",
+		"http://www.onvif.org/ver10/media/wsdl":   "Media",
+		"http://www.onvif.org/ver10/schema":       "Onvif",
+		"http://docs.oasis-open.org/wsn/b-2":      "B2",
+	}
+	gowsdl, err := gen.NewGoWSDL(wsdlPath, *pkg, *insecure, *makePublic, prefix)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -126,8 +133,8 @@ func main() {
 	data := new(bytes.Buffer)
 	data.Write(gocode["header"])
 	data.Write(gocode["types"])
-	data.Write(gocode["operations"])
-	data.Write(gocode["soap"])
+	//data.Write(gocode["operations"])
+	//data.Write(gocode["soap"])
 
 	// go fmt the generated code
 	source, err := format.Source(data.Bytes())
@@ -137,6 +144,11 @@ func main() {
 	}
 
 	file.Write(source)
+	cmd := exec.Command("goimports", "-w", filepath.Join(pkg, *outFile))
+	err = cmd.Run()
+	if err != nil {
+		log.Fatalln(err)
+	}
 
 	log.Println("Done 👍")
 }

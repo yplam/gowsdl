@@ -7,6 +7,7 @@ package gowsdl
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/base64"
 	"encoding/xml"
 	"errors"
 	"fmt"
@@ -36,17 +37,30 @@ type GoWSDL struct {
 	resolvedXSDExternals  map[string]bool
 	currentRecursionLevel uint8
 	currentNamespace      string
+
+	// name prefix for namespace
+	nsPrefix      map[string]string
+	currentPrefix string
 }
 
 // Method setNS sets (and returns) the currently active XML namespace.
 func (g *GoWSDL) setNS(ns string) string {
 	g.currentNamespace = ns
+	g.currentPrefix = ""
+	if p, ok := g.nsPrefix[ns]; ok {
+		log.Println("using prefix", p)
+		g.currentPrefix = p
+	}
 	return ns
 }
 
 // Method setNS returns the currently active XML namespace.
 func (g *GoWSDL) getNS() string {
 	return g.currentNamespace
+}
+
+func (g *GoWSDL) wrapNS(name string) string {
+	return g.currentPrefix + name
 }
 
 var cacheDir = filepath.Join(os.TempDir(), "gowsdl-cache")
@@ -93,7 +107,7 @@ func downloadFile(url string, ignoreTLS bool) ([]byte, error) {
 }
 
 // NewGoWSDL initializes WSDL generator.
-func NewGoWSDL(file, pkg string, ignoreTLS bool, exportAllTypes bool) (*GoWSDL, error) {
+func NewGoWSDL(file, pkg string, ignoreTLS bool, exportAllTypes bool, nsPrefix map[string]string) (*GoWSDL, error) {
 	file = strings.TrimSpace(file)
 	if file == "" {
 		return nil, errors.New("WSDL file is required to generate Go proxy")
@@ -118,6 +132,7 @@ func NewGoWSDL(file, pkg string, ignoreTLS bool, exportAllTypes bool) (*GoWSDL, 
 		pkg:          pkg,
 		ignoreTLS:    ignoreTLS,
 		makePublicFn: makePublicFn,
+		nsPrefix:     nsPrefix,
 	}, nil
 }
 
@@ -175,8 +190,19 @@ func (g *GoWSDL) fetchFile(loc *Location) (data []byte, err error) {
 		log.Println("Reading", "file", loc.f)
 		data, err = ioutil.ReadFile(loc.f)
 	} else {
-		log.Println("Downloading", "file", loc.u.String())
-		data, err = downloadFile(loc.u.String(), g.ignoreTLS)
+		key := base64.StdEncoding.EncodeToString([]byte(loc.u.String()))
+		fname := filepath.Join("cache", key)
+		_, err := os.Stat(fname)
+		if os.IsNotExist(err) {
+			log.Println("Downloading", "file", loc.u.String())
+			data, err = downloadFile(loc.u.String(), g.ignoreTLS)
+			if err == nil {
+				ioutil.WriteFile(fname, data, 0666)
+			}
+		} else {
+			log.Println("Loading cache", "file", loc.u.String())
+			data, err = ioutil.ReadFile(fname)
+		}
 	}
 	return
 }
@@ -268,7 +294,7 @@ func (g *GoWSDL) resolveXSDExternals(schema *XSDSchema, loc *Location) error {
 
 func (g *GoWSDL) genTypes() ([]byte, error) {
 	funcMap := template.FuncMap{
-		"toGoType":                 toGoType,
+		"toGoType":                 g.toGoType,
 		"stripns":                  stripns,
 		"replaceReservedWords":     replaceReservedWords,
 		"replaceAttrReservedWords": replaceAttrReservedWords,
@@ -282,6 +308,7 @@ func (g *GoWSDL) genTypes() ([]byte, error) {
 		"removePointerFromType":    removePointerFromType,
 		"setNS":                    g.setNS,
 		"getNS":                    g.getNS,
+		"wrapNS":                   g.wrapNS,
 	}
 
 	data := new(bytes.Buffer)
@@ -296,7 +323,7 @@ func (g *GoWSDL) genTypes() ([]byte, error) {
 
 func (g *GoWSDL) genOperations() ([]byte, error) {
 	funcMap := template.FuncMap{
-		"toGoType":             toGoType,
+		"toGoType":             g.toGoType,
 		"stripns":              stripns,
 		"replaceReservedWords": replaceReservedWords,
 		"normalize":            normalize,
@@ -319,7 +346,7 @@ func (g *GoWSDL) genOperations() ([]byte, error) {
 
 func (g *GoWSDL) genHeader() ([]byte, error) {
 	funcMap := template.FuncMap{
-		"toGoType":             toGoType,
+		"toGoType":             g.toGoType,
 		"stripns":              stripns,
 		"replaceReservedWords": replaceReservedWords,
 		"normalize":            normalize,
@@ -456,6 +483,11 @@ var xsd2GoTypes = map[string]string{
 	"anytype":       "AnyType",
 	"ncname":        "NCName",
 	"anyuri":        "AnyURI",
+
+	//"qname":              "string",
+	"duration": "AnyDuration",
+	//"anysimpletype":      "string",
+	//"nonnegativeinteger": "uint64",
 }
 
 func removeNS(xsdType string) string {
@@ -469,7 +501,7 @@ func removeNS(xsdType string) string {
 	return r[0]
 }
 
-func toGoType(xsdType string, nillable bool) string {
+func (g *GoWSDL) toGoType(xsdType string, nillable bool) string {
 	// Handles name space, ie. xsd:string, xs:string
 	r := strings.Split(xsdType, ":")
 
@@ -486,6 +518,35 @@ func toGoType(xsdType string, nillable bool) string {
 			value = "*" + value
 		}
 		return value
+	}
+	//if (len(r)) == 1 && g.currentPrefix != "" {
+	//	t = g.currentPrefix + r[0]
+	//	//log.Println("current prefix", g.currentPrefix, r[0])
+	//}
+	if len(r) == 2 {
+		found := false
+		// replace ns with prefix
+		if ns, ok := g.wsdl.Xmlns[r[0]]; ok {
+			if p, ok := g.nsPrefix[ns]; ok {
+				t = p + r[1]
+				found = true
+				//log.Println("Prefix", t)
+			}
+		}
+		if !found {
+			for _, sch := range g.wsdl.Types.Schemas {
+				if ns, ok := sch.Xmlns[r[0]]; ok {
+					if p, ok := g.nsPrefix[ns]; ok {
+						t = p + r[1]
+						found = true
+						//log.Println("Prefix", t)
+					}
+				}
+			}
+		}
+		if !found {
+			log.Println("not found", xsdType)
+		}
 	}
 
 	return "*" + replaceReservedWords(makePublic(t))

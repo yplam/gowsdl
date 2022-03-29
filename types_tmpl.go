@@ -6,7 +6,8 @@ package gowsdl
 
 var typesTmpl = `
 {{define "SimpleType"}}
-	{{$typeName := replaceReservedWords .Name | makePublic}}
+	// SimpleTypeT
+	{{$typeName := replaceReservedWords .Name | wrapNS | makePublic}}
 	{{if .Doc}} {{.Doc | comment}} {{end}}
 	{{if ne .List.ItemType ""}}
 		type {{$typeName}} []{{toGoType .List.ItemType false | removePointerFromType}}
@@ -32,6 +33,7 @@ var typesTmpl = `
 {{end}}
 
 {{define "ComplexContent"}}
+	// ComplexContent
 	{{$baseType := toGoType .Extension.Base false}}
 	{{ if $baseType }}
 		{{$baseType}}
@@ -44,23 +46,26 @@ var typesTmpl = `
 {{end}}
 
 {{define "Attributes"}}
+	// Attributes
     {{ $targetNamespace := getNS }}
 	{{range .}}
 		{{if .Doc}} {{.Doc | comment}} {{end}}
 		{{ if ne .Type "" }}
-			{{ normalize .Name | makeFieldPublic}} {{toGoType .Type false}} ` + "`" + `xml:"{{with $targetNamespace}}{{.}} {{end}}{{.Name}},attr,omitempty" json:"{{.Name}},omitempty"` + "`" + `
+			{{ normalize .Name | makeFieldPublic}} {{toGoType .Type false}} ` + "`" + `xml:"{{.Name}},attr,omitempty" json:"{{.Name}},omitempty"` + "`" + `
 		{{ else }}
-			{{ normalize .Name | makeFieldPublic}} string ` + "`" + `xml:"{{with $targetNamespace}}{{.}} {{end}}{{.Name}},attr,omitempty" json:"{{.Name}},omitempty"` + "`" + `
+			{{ normalize .Name | makeFieldPublic}} string ` + "`" + `xml:"{{.Name}},attr,omitempty" json:"{{.Name}},omitempty"` + "`" + `
 		{{ end }}
 	{{end}}
 {{end}}
 
 {{define "SimpleContent"}}
+	// SimpleContent
 	Value {{toGoType .Extension.Base false}} ` + "`xml:\",chardata\" json:\"-,\"`" + `
 	{{template "Attributes" .Extension.Attributes}}
 {{end}}
 
 {{define "ComplexTypeInline"}}
+	// ComplexTypeInline
 	{{replaceReservedWords .Name | makePublic}} {{if eq .MaxOccurs "unbounded"}}[]{{end}}struct {
 	{{with .ComplexType}}
 		{{if ne .ComplexContent.Extension.Base ""}}
@@ -79,6 +84,7 @@ var typesTmpl = `
 {{end}}
 
 {{define "Elements"}}
+	// ElementsT
 	{{range .}}
 		{{if ne .Ref ""}}
 			{{removeNS .Ref | replaceReservedWords  | makePublic}} {{if eq .MaxOccurs "unbounded"}}[]{{end}}{{toGoType .Ref .Nillable }} ` + "`" + `xml:"{{.Ref | removeNS}},omitempty" json:"{{.Ref | removeNS}},omitempty"` + "`" + `
@@ -102,6 +108,7 @@ var typesTmpl = `
 {{end}}
 
 {{define "Any"}}
+	// Any
 	{{range .}}
 		Items     []string ` + "`" + `xml:",any" json:"items,omitempty"` + "`" + `
 	{{end}}
@@ -109,17 +116,19 @@ var typesTmpl = `
 
 {{range .Schemas}}
 	{{ $targetNamespace := setNS .TargetNamespace }}
-
+	// Schema {{$targetNamespace}}
 	{{range .SimpleType}}
 		{{template "SimpleType" .}}
 	{{end}}
 
 	{{range .Elements}}
 		{{$name := .Name}}
-		{{$typeName := replaceReservedWords $name | makePublic}}
+		// Elements {{$targetNamespace}}
+		{{$typeName := replaceReservedWords $name | wrapNS | makePublic}}
 		{{if not .Type}}
 			{{/* ComplexTypeLocal */}}
 			{{with .ComplexType}}
+				// ComplexTypeLocal $targetNamespace
 				type {{$typeName}} struct {
 					XMLName xml.Name ` + "`xml:\"{{$targetNamespace}} {{$name}}\"`" + `
 					{{if ne .ComplexContent.Extension.Base ""}}
@@ -138,6 +147,7 @@ var typesTmpl = `
 			{{end}}
 			{{/* SimpleTypeLocal */}}
 			{{with .SimpleType}}
+				// SimpleType
 				{{if .Doc}} {{.Doc | comment}} {{end}}
 				{{if ne .List.ItemType ""}}
 					type {{$typeName}} []{{toGoType .List.ItemType false | removePointerFromType}}
@@ -150,7 +160,7 @@ var typesTmpl = `
 				{{else}}
 					type {{$typeName}} interface{}
 				{{end}}
-			
+
 				{{if .Restriction.Enumeration}}
 				const (
 					{{with .Restriction}}
@@ -196,7 +206,8 @@ var typesTmpl = `
 
 	{{range .ComplexTypes}}
 		{{/* ComplexTypeGlobal */}}
-		{{$typeName := replaceReservedWords .Name | makePublic}}
+		// ComplexTypeGlobal {{ $targetNamespace }}
+		{{$typeName := replaceReservedWords .Name | wrapNS | makePublic}}
 		{{if and (eq (len .SimpleContent.Extension.Attributes) 0) (eq (toGoType .SimpleContent.Extension.Base false) "string") }}
 			type {{$typeName}} string
 		{{else}}

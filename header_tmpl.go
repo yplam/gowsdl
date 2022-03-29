@@ -32,4 +32,12 @@ type AnyURI string
 
 type NCName string
 
+type AnyDuration string
+
+type QName string
+
+type AnySimpleType string
+
+type NonNegativeInteger uint64
+
 `
