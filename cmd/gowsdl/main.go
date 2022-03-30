@@ -123,16 +123,24 @@ func main() {
 
 	pkg := filepath.Join(*dir, *pkg)
 	err = os.Mkdir(pkg, 0744)
+	outfile(gocode, pkg, "types")
+	outfile(gocode, pkg, "operations")
+	outfile(gocode, pkg, "soap")
+	log.Println("Done 👍")
+}
 
-	file, err := os.Create(filepath.Join(pkg, *outFile))
+func outfile(gocode map[string][]byte, pkg, key string) error {
+	fname := filepath.Join(pkg, key+".go")
+	file, err := os.Create(fname)
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
 	defer file.Close()
 
 	data := new(bytes.Buffer)
 	data.Write(gocode["header"])
-	data.Write(gocode["types"])
+	data.Write(gocode[key])
+
 	//data.Write(gocode["operations"])
 	//data.Write(gocode["soap"])
 
@@ -141,14 +149,14 @@ func main() {
 	if err != nil {
 		file.Write(data.Bytes())
 		log.Fatalln(err)
+		return err
 	}
 
 	file.Write(source)
-	cmd := exec.Command("goimports", "-w", filepath.Join(pkg, *outFile))
+	cmd := exec.Command("goimports", "-w", fname)
 	err = cmd.Run()
 	if err != nil {
-		log.Fatalln(err)
+		return err
 	}
-
-	log.Println("Done 👍")
+	return nil
 }

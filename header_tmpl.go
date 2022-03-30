@@ -40,4 +40,6 @@ type AnySimpleType string
 
 type NonNegativeInteger uint64
 
+type IDREFS string
+
 `
