@@ -4,7 +4,7 @@
 
 package gowsdl
 
-var opsTmpl = `
+var _ = `
 {{range .}}
 	{{$privateType := .Name | makePrivate}}
 	{{$exportType := .Name | makePublic}}
@@ -22,7 +22,9 @@ var opsTmpl = `
 			// {{range .Faults}}
 			//   - {{.Name}} {{.Doc}}{{end}}{{end}}
 			{{if ne .Doc ""}}/* {{.Doc}} */{{end}}
-			{{makePublic .Name | replaceReservedWords}} (ctx context.Context, {{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error)
+			{{makePublic .Name | replaceReservedWords}} ({{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error)
+			{{/*end*/}}
+			{{makePublic .Name | replaceReservedWords}}Context (ctx context.Context, {{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error)
 			{{/*end*/}}
 		{{end}}
 	}
@@ -41,34 +43,23 @@ var opsTmpl = `
 		{{$requestType := findType .Input.Message | replaceReservedWords | makePublic}}
 		{{$soapAction := findSOAPAction .Name $privateType}}
 		{{$responseType := findType .Output.Message | replaceReservedWords | makePublic}}
-
-		type {{$requestType}}Body struct {
-			{{$requestType}} {{$requestType}}
-		}
-
-		type {{$responseType}}Body struct {
-			soap.EnvelopeResponseBody
-			{{$responseType}} {{$responseType}}
-		}
-
-		func (service *{{$privateType}}) {{makePublic .Name | replaceReservedWords}} (ctx context.Context, {{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error) {
-
-			envelope := soap.NewEnvelope()
-			envelope.Body = &request
-
-			response := new({{$responseType}}Body)
-			envelopeResp := &soap.EnvelopeResponse{
-				Body: response,
-			}
-			err := service.client.Call(ctx,
-				"{{if ne $soapAction ""}}{{$soapAction}}{{else}}''{{end}}",
-				envelope, envelopeResp)
+		func (service *{{$privateType}}) {{makePublic .Name | replaceReservedWords}}Context (ctx context.Context, {{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error) {
+			{{if ne $responseType ""}}response := new({{$responseType}}){{end}}
+			err := service.client.CallContext(ctx, "{{if ne $soapAction ""}}{{$soapAction}}{{else}}''{{end}}", {{if ne $requestType ""}}request{{else}}nil{{end}}, {{if ne $responseType ""}}response{{else}}struct{}{}{{end}})
 			if err != nil {
 				return {{if ne $responseType ""}}nil, {{end}}err
 			}
-			return {{if ne $responseType ""}}&response.{{$responseType}}, {{end}}nil
 
+			return {{if ne $responseType ""}}response, {{end}}nil
 		}
+
+		func (service *{{$privateType}}) {{makePublic .Name | replaceReservedWords}} ({{if ne $requestType ""}}request *{{$requestType}}{{end}}) ({{if ne $responseType ""}}*{{$responseType}}, {{end}}error) {
+			return service.{{makePublic .Name | replaceReservedWords}}Context(
+				context.Background(),
+				{{if ne $requestType ""}}request,{{end}}
+			)
+		}
+
 	{{end}}
 {{end}}
 `

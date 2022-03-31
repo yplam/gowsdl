@@ -125,7 +125,7 @@ func main() {
 	err = os.Mkdir(pkg, 0744)
 	outfile(gocode, pkg, "types")
 	outfile(gocode, pkg, "operations")
-	outfile(gocode, pkg, "soap")
+	//outfile(gocode, pkg, "soap")
 	log.Println("Done 👍")
 }
 
@@ -138,7 +138,12 @@ func outfile(gocode map[string][]byte, pkg, key string) error {
 	defer file.Close()
 
 	data := new(bytes.Buffer)
-	data.Write(gocode["header"])
+	if key == "types" {
+		data.Write(gocode["header"])
+	} else {
+		data.Write(gocode["imports"])
+	}
+
 	data.Write(gocode[key])
 
 	//data.Write(gocode["operations"])

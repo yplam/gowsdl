@@ -143,7 +143,7 @@ type WSDLFault struct {
 	Name      string        `xml:"name,attr"`
 	Message   string        `xml:"message,attr"`
 	Doc       string        `xml:"documentation"`
-	SOAPFault WSDLSOAPFault `xml:"http://schemas.xmlsoap.org/wsdl/soap/ fault"`
+	SOAPFault WSDLSOAPFault `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ fault"`
 }
 
 // WSDLInput represents a WSDL input message.
@@ -151,8 +151,8 @@ type WSDLInput struct {
 	Name       string            `xml:"name,attr"`
 	Message    string            `xml:"message,attr"`
 	Doc        string            `xml:"documentation"`
-	SOAPBody   WSDLSOAPBody      `xml:"http://schemas.xmlsoap.org/wsdl/soap/ body"`
-	SOAPHeader []*WSDLSOAPHeader `xml:"http://schemas.xmlsoap.org/wsdl/soap/ header"`
+	SOAPBody   WSDLSOAPBody      `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ body"`
+	SOAPHeader []*WSDLSOAPHeader `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ header"`
 }
 
 // WSDLOutput represents a WSDL output message.
@@ -160,8 +160,8 @@ type WSDLOutput struct {
 	Name       string            `xml:"name,attr"`
 	Message    string            `xml:"message,attr"`
 	Doc        string            `xml:"documentation"`
-	SOAPBody   WSDLSOAPBody      `xml:"http://schemas.xmlsoap.org/wsdl/soap/ body"`
-	SOAPHeader []*WSDLSOAPHeader `xml:"http://schemas.xmlsoap.org/wsdl/soap/ header"`
+	SOAPBody   WSDLSOAPBody      `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ body"`
+	SOAPHeader []*WSDLSOAPHeader `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ header"`
 }
 
 // WSDLOperation represents the contract of an entire operation or function.
@@ -171,7 +171,7 @@ type WSDLOperation struct {
 	Input         WSDLInput         `xml:"input"`
 	Output        WSDLOutput        `xml:"output"`
 	Faults        []*WSDLFault      `xml:"fault"`
-	SOAPOperation WSDLSOAPOperation `xml:"http://schemas.xmlsoap.org/wsdl/soap/ operation"`
+	SOAPOperation WSDLSOAPOperation `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ operation"`
 }
 
 // WSDLPortType defines the service, operations that can be performed and the messages involved.
@@ -239,7 +239,7 @@ type WSDLBinding struct {
 	Name        string           `xml:"name,attr"`
 	Type        string           `xml:"type,attr"`
 	Doc         string           `xml:"documentation"`
-	SOAPBinding WSDLSOAPBinding  `xml:"http://schemas.xmlsoap.org/wsdl/soap/ binding"`
+	SOAPBinding WSDLSOAPBinding  `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ binding"`
 	Operations  []*WSDLOperation `xml:"http://schemas.xmlsoap.org/wsdl/ operation"`
 }
 
@@ -248,7 +248,7 @@ type WSDLPort struct {
 	Name        string          `xml:"name,attr"`
 	Binding     string          `xml:"binding,attr"`
 	Doc         string          `xml:"documentation"`
-	SOAPAddress WSDLSOAPAddress `xml:"http://schemas.xmlsoap.org/wsdl/soap/ address"`
+	SOAPAddress WSDLSOAPAddress `xml:"http://schemas.xmlsoap.org/wsdl/soap12/ address"`
 }
 
 // WSDLService defines the list of SOAP services associated with the WSDL.

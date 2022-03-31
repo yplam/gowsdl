@@ -182,6 +182,11 @@ func (g *GoWSDL) Start() (map[string][]byte, error) {
 		log.Println(err)
 	}
 
+	gocode["imports"], err = g.genImports()
+	if err != nil {
+		log.Println(err)
+	}
+
 	return gocode, nil
 }
 
@@ -357,6 +362,27 @@ func (g *GoWSDL) genHeader() ([]byte, error) {
 
 	data := new(bytes.Buffer)
 	tmpl := template.Must(template.New("header").Funcs(funcMap).Parse(headerTmpl))
+	err := tmpl.Execute(data, g.pkg)
+	if err != nil {
+		return nil, err
+	}
+
+	return data.Bytes(), nil
+}
+
+func (g *GoWSDL) genImports() ([]byte, error) {
+	funcMap := template.FuncMap{
+		"toGoType":             g.toGoType,
+		"stripns":              stripns,
+		"replaceReservedWords": replaceReservedWords,
+		"normalize":            normalize,
+		"makePublic":           g.makePublicFn,
+		"findType":             g.findType,
+		"comment":              comment,
+	}
+
+	data := new(bytes.Buffer)
+	tmpl := template.Must(template.New("imports").Funcs(funcMap).Parse(importsTmpl))
 	err := tmpl.Execute(data, g.pkg)
 	if err != nil {
 		return nil, err
@@ -607,13 +633,17 @@ func (g *GoWSDL) findNameByType(name string) string {
 // TODO(c4milo): Add support for namespaces instead of striping them out
 // TODO(c4milo): improve runtime complexity if performance turns out to be an issue.
 func (g *GoWSDL) findSOAPAction(operation, portType string) string {
+	log.Println("op", operation, "pt", portType)
 	for _, binding := range g.wsdl.Binding {
+		log.Println("bt", binding.Type)
 		if strings.ToUpper(stripns(binding.Type)) != strings.ToUpper(portType) {
 			continue
 		}
 
 		for _, soapOp := range binding.Operations {
+			//log.Println("bo", soapOp.Name)
 			if soapOp.Name == operation {
+				log.Println("found", soapOp.SOAPOperation.SOAPAction)
 				return soapOp.SOAPOperation.SOAPAction
 			}
 		}
